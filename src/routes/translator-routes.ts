@@ -4,7 +4,7 @@ import { TRANSLATOR_ROLE } from "../const/webtoon-status-const";
 import { checkAdminRole } from "../service/admin/admin-service";
 import { generateUploadUrl } from "../service/s3/s3-client";
 import {
-  aiTranslateEpisode,
+  // aiTranslateEpisode,
   deleteStylePreset,
   detailWithEpisodesTranslator,
   getEpisodeImages,
@@ -78,9 +78,23 @@ app.post("/updateEpisodeImage", async (c) => {
   const denied = await requireTranslator(c);
   if (denied) return denied;
   const user = c.get("user")!;
-  const { imageId, editedImageUrl, bubbles, otherObjects, canvas_width, canvas_height } =
-    await c.req.json();
-  await updateEpisodeImage(imageId, editedImageUrl, bubbles, otherObjects, canvas_width, canvas_height, user);
+  const {
+    imageId,
+    editedImageUrl,
+    bubbles,
+    otherObjects,
+    canvas_width,
+    canvas_height,
+  } = await c.req.json();
+  await updateEpisodeImage(
+    imageId,
+    editedImageUrl,
+    bubbles,
+    otherObjects,
+    canvas_width,
+    canvas_height,
+    user,
+  );
   return c.json({ success: true });
 });
 
@@ -120,18 +134,18 @@ app.delete("/deleteStylePreset", async (c) => {
   return c.json(result);
 });
 
-app.post("/aiTranslateEpisode", async (c) => {
-  const denied = await requireTranslator(c);
-  if (denied) return denied;
-  const user = c.get("user")!;
-  const { webtoonId, episodeId } = await c.req.json();
-  if (!webtoonId || !episodeId) return c.json({ error: "Bad Request" }, 400);
-  try {
-    await aiTranslateEpisode(webtoonId, episodeId, user);
-  } catch (error) {
-    return c.json({ message: (error as Error).message }, 500);
-  }
-  return c.json({ success: true });
-});
+// app.post("/aiTranslateEpisode", async (c) => {
+//   const denied = await requireTranslator(c);
+//   if (denied) return denied;
+//   const user = c.get("user")!;
+//   const { webtoonId, episodeId } = await c.req.json();
+//   if (!webtoonId || !episodeId) return c.json({ error: "Bad Request" }, 400);
+//   try {
+//     await aiTranslateEpisode(webtoonId, episodeId, user);
+//   } catch (error) {
+//     return c.json({ message: (error as Error).message }, 500);
+//   }
+//   return c.json({ success: true });
+// });
 
 export default app;

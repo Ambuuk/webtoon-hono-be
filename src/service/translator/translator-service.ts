@@ -1,16 +1,23 @@
 import type { DecodedIdToken } from "../../types/firebase";
 import pLimit from "p-limit";
-import { EPISODE_IMAGES_PREFIX, FIVE_MINUTE, IMAGE_DETAIL_PREFIX, ONE_HOUR, TRANSLATOR_WEBTOON_DETAIL_PREFIX, TRANSLATOR_WEBTOON_PREFIX } from "../../const/redis-const";
+import {
+  EPISODE_IMAGES_PREFIX,
+  FIVE_MINUTE,
+  IMAGE_DETAIL_PREFIX,
+  ONE_HOUR,
+  TRANSLATOR_WEBTOON_DETAIL_PREFIX,
+  TRANSLATOR_WEBTOON_PREFIX,
+} from "../../const/redis-const";
 import { CDN_URL } from "../../const/url-const";
 import { PUBLISHED } from "../../const/webtoon-status-const";
 import { pool } from "../../database";
 import { redisDelete, redisGet, redisSet } from "../../database/redis";
-import { translateBubbles } from "../chatgpt/chatgpt-service";
+// import { translateBubbles } from "../chatgpt/chatgpt-service";
 import { findTranslation, updateTranslationMemory } from "../ocr/ocr-service";
 import { deleteMany } from "../s3/s3-client";
 import {
   checkTranslatorAssignment,
-  getUserByFirebaseUid
+  getUserByFirebaseUid,
 } from "../util/user-util";
 
 export async function getWebtoonList(uid: string) {
@@ -179,7 +186,7 @@ export async function getImageDetail(
       AND ei.id = $3
     LIMIT 1
     `,
-    [webtoonId, episodeNumber, imageId]
+    [webtoonId, episodeNumber, imageId],
   );
 
   if (!rows.length) {
@@ -193,20 +200,16 @@ export async function getImageDetail(
       `SELECT id FROM episode_images 
        WHERE id > $1 AND episode_id = $2 
        ORDER BY id ASC LIMIT 1`,
-      [imageId, image.episode_id]
+      [imageId, image.episode_id],
     ),
     pool.query(
       `SELECT id FROM episode_images 
        WHERE id < $1 AND episode_id = $2 
        ORDER BY id DESC LIMIT 1`,
-      [imageId, image.episode_id]
+      [imageId, image.episode_id],
     ),
-    pool.query(
-      `SELECT * FROM bubble WHERE image_id = $1`,
-      [imageId]
-    ),
+    pool.query(`SELECT * FROM bubble WHERE image_id = $1`, [imageId]),
   ]);
-
 
   let bubbles = bubbleRes.rows;
 
@@ -252,7 +255,7 @@ export async function updateEpisodeImage(
   otherObjects: any[],
   canvas_width: number,
   canvas_height: number,
-  userInfo: DecodedIdToken
+  userInfo: DecodedIdToken,
 ) {
   const client = await pool.connect();
   let oldImageUrl: string | null = null;
@@ -264,7 +267,7 @@ export async function updateEpisodeImage(
       `SELECT edited_image_url, episode_id 
        FROM episode_images 
        WHERE id = $1`,
-      [imageId]
+      [imageId],
     );
 
     if (!imageRows.length) throw new Error("Image not found");
@@ -290,7 +293,7 @@ export async function updateEpisodeImage(
         canvas_width,
         canvas_height,
         imageId,
-        user.id
+        user.id,
       ],
     );
 
@@ -298,22 +301,19 @@ export async function updateEpisodeImage(
       `SELECT id, group_id, segment_index 
        FROM bubble 
        WHERE image_id = $1`,
-      [imageId]
+      [imageId],
     );
 
-    const existingMap = new Map(existingBubbles.map(b => [b.id, b]));
-    const incomingIds = new Set(bubbles.map(b => b.id).filter(Boolean));
+    const existingMap = new Map(existingBubbles.map((b) => [b.id, b]));
+    const incomingIds = new Set(bubbles.map((b) => b.id).filter(Boolean));
 
     if (incomingIds.size > 0) {
       await client.query(
         `DELETE FROM bubble WHERE image_id = $1 AND id <> ALL($2::uuid[])`,
-        [imageId, Array.from(incomingIds)]
+        [imageId, Array.from(incomingIds)],
       );
     } else {
-      await client.query(
-        `DELETE FROM bubble WHERE image_id = $1`,
-        [imageId]
-      );
+      await client.query(`DELETE FROM bubble WHERE image_id = $1`, [imageId]);
     }
 
     const { rows: nextImageRows } = await client.query(
@@ -334,13 +334,13 @@ export async function updateEpisodeImage(
       nextImageId = nextImageRows[0].id;
     }
 
-
     for (const bubble of bubbles) {
       const existing = existingMap.get(bubble.id);
       let groupId = bubble.group_id ?? existing?.group_id ?? null;
 
       if (bubble.continuesToNextPanel == 1 && !groupId) {
-        const { rows } = await client.query(`
+        const { rows } = await client.query(
+          `
           INSERT INTO bubble_group (image_id)
           VALUES ($1)
           RETURNING id
@@ -428,7 +428,7 @@ export async function updateEpisodeImage(
 
       // 🟢 AUTO CREATE CONTINUATION IN NEXT PANEL
       if (bubble.continuesToNextPanel == 1 && nextImageId) {
-        const hasSegment2 = groupBubbles.some(b => b.segment_index === 2);
+        const hasSegment2 = groupBubbles.some((b) => b.segment_index === 2);
         if (nextImageRows.length > 0 && nextImageId && !hasSegment2) {
           const nextTop = bubble.top - canvas_height;
 
@@ -463,9 +463,8 @@ export async function updateEpisodeImage(
       }
 
       if (groupId) {
-
-        const ourBubble = groupBubbles.find(b => b.id === bubble.id);
-        const previousBubble = groupBubbles.find(b => b.segment_index === 1);
+        const ourBubble = groupBubbles.find((b) => b.id === bubble.id);
+        const previousBubble = groupBubbles.find((b) => b.segment_index === 1);
 
         const sql = `
   UPDATE bubble 
@@ -522,7 +521,6 @@ export async function updateEpisodeImage(
       }
 
       await redisDelete(IMAGE_DETAIL_PREFIX + nextImageId);
-
     }
 
     await client.query("COMMIT");
@@ -557,7 +555,6 @@ export async function updateEpisodeCleaned(
     "UPDATE episode_images SET cleaned_image_url = $1 WHERE id = $2",
     [cleanedImageUrl, episodeId],
   );
-
 
   const cacheKey = IMAGE_DETAIL_PREFIX + episodeId;
   await redisDelete(cacheKey);
@@ -595,10 +592,7 @@ export async function saveStylePreset(
   }
 }
 
-export async function deleteStylePreset(
-  user: DecodedIdToken,
-  id: string
-) {
+export async function deleteStylePreset(user: DecodedIdToken, id: string) {
   const userInfo = await getUserByFirebaseUid(user.uid);
   const client = await pool.connect();
   try {
@@ -608,7 +602,7 @@ export async function deleteStylePreset(
       [id, userInfo.id],
     );
     await client.query("COMMIT");
-    return { success: true }
+    return { success: true };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -617,42 +611,44 @@ export async function deleteStylePreset(
   }
 }
 
-export async function aiTranslateEpisode(webtoonId: number, episodeId: number, user: DecodedIdToken) {
-  await checkTranslatorAssignment(user, webtoonId);
+// export async function aiTranslateEpisode(webtoonId: number, episodeId: number, user: DecodedIdToken) {
+//   await checkTranslatorAssignment(user, webtoonId);
 
-  const { rows: episodeRows } = await pool.query(`select translation_status, status from webtoon_episodes where id = $1`, [episodeId]);
+//   const { rows: episodeRows } = await pool.query(`select translation_status, status from webtoon_episodes where id = $1`, [episodeId]);
 
-  if (episodeRows[0].translation_status && episodeRows[0].translation_status === 'TRANSLATED') {
-    throw new Error('Энэ ангийг AI-р орчуулсан байна.');
-  }
+//   if (episodeRows[0].translation_status && episodeRows[0].translation_status === 'TRANSLATED') {
+//     throw new Error('Энэ ангийг AI-р орчуулсан байна.');
+//   }
 
-  if (episodeRows[0].status && episodeRows[0].status === PUBLISHED) {
-    throw new Error('Энэ ангийг PUBLISH хийсэн байна.');
-  }
+//   if (episodeRows[0].status && episodeRows[0].status === PUBLISHED) {
+//     throw new Error('Энэ ангийг PUBLISH хийсэн байна.');
+//   }
 
-  const { rows: bubbles } = await pool.query(
-    `SELECT b.id, b.original_text, b.image_id
-      FROM bubble b
-      JOIN episode_images ei ON b.image_id = ei.id
-      WHERE ei.episode_id = $1
-      ORDER BY b.image_id`, [episodeId]
-  );
+//   const { rows: bubbles } = await pool.query(
+//     `SELECT b.id, b.original_text, b.image_id
+//       FROM bubble b
+//       JOIN episode_images ei ON b.image_id = ei.id
+//       WHERE ei.episode_id = $1
+//       ORDER BY b.image_id`, [episodeId]
+//   );
 
-  const chunks = chunkArray(bubbles, 30);
-  const limit = pLimit(5); // max 5 concurrent
+//   const chunks = chunkArray(bubbles, 30);
+//   const limit = pLimit(5); // max 5 concurrent
 
-  const results = await Promise.all(
-    chunks.map((chunk) =>
-      limit(() => translateBubbles(JSON.stringify(chunk)))
-    )
-  );
+//   const results = await Promise.all(
+//     chunks.map((chunk) =>
+//       limit(() => translateBubbles(JSON.stringify(chunk)))
+//     )
+//   );
 
-  const allTranslations = results.flat();
-  await updateBubbles(allTranslations);
-  await pool.query(`update webtoon_episodes set translation_status = 'TRANSLATED' where id = $1`, [episodeId]);
-}
+//   const allTranslations = results.flat();
+//   await updateBubbles(allTranslations);
+//   await pool.query(`update webtoon_episodes set translation_status = 'TRANSLATED' where id = $1`, [episodeId]);
+// }
 
-async function updateBubbles(translations: { id: string, translated: string }[]) {
+async function updateBubbles(
+  translations: { id: string; translated: string }[],
+) {
   if (translations.length === 0) return;
 
   // Build a VALUES string for PostgreSQL
@@ -661,7 +657,7 @@ async function updateBubbles(translations: { id: string, translated: string }[])
     .join(", ");
 
   // Flatten the array of values for query parameters
-  const params = translations.flatMap(t => [t.id, t.translated]);
+  const params = translations.flatMap((t) => [t.id, t.translated]);
 
   const query = `
     UPDATE bubble AS b
