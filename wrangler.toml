@@ -1,0 +1,22 @@
+name = "webtoon-hono-be"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Set non-secret vars here; secrets go through `wrangler secret put`
+# [vars]
+# NODE_ENV = "production"
+
+# Secrets (set via `wrangler secret put <NAME>`):
+#   DATABASE_URL
+#   UPSTASH_REDIS_REST_URL
+#   UPSTASH_REDIS_REST_TOKEN
+#   R2_ACCOUNT_ID
+#   R2_ACCESS_KEY_ID
+#   R2_SECRET_ACCESS_KEY
+#   CLOUDFLARE_STREAM_API_KEY
+#   FIREBASE_PROJECT_ID
+#   OPENAI_API_KEY
+#   DISCORD_WEBHOOK_URL
+#   QPAY_USERNAME
+#   QPAY_PASSWORD
